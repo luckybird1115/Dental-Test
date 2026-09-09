@@ -101,16 +101,16 @@ class UIControls {
   // Wire up the new design UI. Camera view buttons are functional;
   // tool / tab / toggle buttons are visual selection only for now.
   setupDesignUI() {
-    // Left toolbar - tool selection. Only the Curve tool is wired to behaviour
-    // for now; the rest are visual selection only.
+    // Left toolbar - tool selection. Curve and Brush are wired to behaviour;
+    // the rest are visual selection only for now.
     const toolButtons = document.querySelectorAll('#ncLeftToolbar .nc-tool-btn');
     toolButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         toolButtons.forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
-        if (this.curveTool) {
-          this.curveTool.setActive(btn.dataset.tool === 'curve');
-        }
+        const tool = btn.dataset.tool;
+        if (this.curveTool) this.curveTool.setActive(tool === 'curve');
+        if (this.brushTool) this.brushTool.setActive(tool === 'brush');
       });
     });
 

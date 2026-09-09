@@ -92,6 +92,8 @@ class CurveTool {
     // Starting to draw again after a finished loop begins a fresh curve.
     if (this.active && this.closed) this.reset();
     else if (this.active) this._updatePanel();
+
+    if (!this.active) this._hideHoverMarker();
   }
 
   isActive() {
@@ -152,6 +154,16 @@ class CurveTool {
         const moved = Math.hypot(e.clientX - this._downPos.x, e.clientY - this._downPos.y);
         if (moved > 4) this._downMoved = true;
       }
+
+      // Hover preview - shows where the next click will land. Clicking no
+      // longer adds a point once the loop is closed, so hide it then.
+      if (this.closed) {
+        this._hideHoverMarker();
+        return;
+      }
+      const hoverHit = this._raycastSurface(e);
+      if (hoverHit) this._updateHoverMarker(hoverHit.point, hoverHit.normal);
+      else this._hideHoverMarker();
     };
 
     this._onUp = (e) => {
@@ -320,8 +332,8 @@ class CurveTool {
     } else {
       this.unit = 40;
     }
-    this.markerRadius = this.unit * 0.006;
-    this.surfaceOffset = this.unit * 0.004;
+    this.markerRadius = this.unit * 0.008;
+    this.surfaceOffset = this.unit * 0.005;
     this.snapProbe = this.unit * 0.12;
     this.closeThreshold = this.unit * 0.06;
   }
@@ -443,6 +455,38 @@ class CurveTool {
 
   _moveMarker(idx) {
     if (this.markers[idx]) this._placeMarker(this.markers[idx], this.anchors[idx]);
+  }
+
+  // Ghost "+" reticle that previews where the next click will land, so the
+  // tool gives feedback as soon as it's selected instead of only after a
+  // click. It billboards to face the camera, like a crosshair marker.
+  _ensureHoverMarker() {
+    if (this.hoverMarker) return;
+    const geo = new THREE.BufferGeometry();
+    const verts = new Float32Array([
+      -1, 0, 0, 1, 0, 0,
+      0, -1, 0, 0, 1, 0
+    ]);
+    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    const mat = new THREE.LineBasicMaterial({ color: 0xe8b98a, transparent: true, opacity: 0.9, depthTest: false });
+    this.hoverMarker = new THREE.LineSegments(geo, mat);
+    this.hoverMarker.renderOrder = 999;
+    this.hoverMarker.layers.set(1);
+    this.hoverMarker.visible = false;
+    this.group.add(this.hoverMarker);
+  }
+
+  _updateHoverMarker(point, normal) {
+    this.ensureScale();
+    this._ensureHoverMarker();
+    this.hoverMarker.position.copy(point).addScaledVector(normal, this.surfaceOffset);
+    this.hoverMarker.scale.setScalar(this.markerRadius * 1.8);
+    this.hoverMarker.quaternion.copy(this.camera.quaternion);
+    this.hoverMarker.visible = true;
+  }
+
+  _hideHoverMarker() {
+    if (this.hoverMarker) this.hoverMarker.visible = false;
   }
 
   _rebuildMarkers() {

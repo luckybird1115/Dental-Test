@@ -58,6 +58,10 @@ class JawViewerApp {
       this.curveTool = new CurveTool(this.sceneManager, this.stageManager);
       this.uiControls.curveTool = this.curveTool;
 
+      // Template brush tool (left toolbar -> Brush)
+      this.brushTool = new BrushTool(this.sceneManager, this.stageManager);
+      this.uiControls.brushTool = this.brushTool;
+
       // Small "COMBINED" preview of the working scene
       const miniMount = document.getElementById('ncCombinedView');
       if (miniMount) {
