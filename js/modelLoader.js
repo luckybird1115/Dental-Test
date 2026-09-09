@@ -10,10 +10,24 @@ class ModelLoader {
     this.maxillaryModels = [];
     this.mandibularModels = [];
     this.maxStages = 100;
+
+    // Single-model mode: load only one lower-jaw model instead of discovering
+    // and downloading every stage. Set to false to restore full multi-stage
+    // loading.
+    this.singleModelMode = true;
+    this.singleModelFilename = 'Mandibular BL 1.glb';
   }
 
   // Function to discover GLB files in model directories
   async discoverModelFiles() {
+    // Single-model mode: skip discovery entirely and use just one lower model.
+    if (this.singleModelMode) {
+      this.maxillaryFiles = [];
+      this.mandibularFiles = [this.singleModelFilename];
+      console.log(`Single-model mode: loading only ${this.singleModelFilename}`);
+      return { maxillaryFiles: this.maxillaryFiles, mandibularFiles: this.mandibularFiles };
+    }
+
     try {
       console.log('Starting optimized file discovery...');
       
