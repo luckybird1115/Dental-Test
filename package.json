@@ -1,0 +1,20 @@
+{
+  "name": "3d-jaw-viewer",
+  "version": "1.0.0",
+  "description": "3D Jaw Treatment Viewer Application",
+  "main": "index.html",
+  "scripts": {
+    "build": "node build-script.js",
+    "obfuscate": "javascript-obfuscator js/ --output dist/js/ --config obfuscator-config.json",
+    "minify": "terser js/*.js --compress --mangle --output dist/js/",
+    "dev": "live-server --port=3000"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^4.0.2",
+    "terser": "^5.19.4",
+    "live-server": "^1.2.2"
+  },
+  "keywords": ["3d", "medical", "jaw", "viewer", "threejs"],
+  "author": "Your Name",
+  "license": "MIT"
+}

@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>3D Jaw Treatment Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    const envHDRUrl = "./assets/env.hdr";
+    const maxillaryPath = "./assets/models/maxillary/";
+    const mandibularPath = "./assets/models/mandibular/";
+  </script>
+  <script src="https://unpkg.com/three@0.146.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/three@0.146.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://unpkg.com/three@0.146.0/examples/js/loaders/RGBELoader.js"></script>
+  <script src="https://unpkg.com/three@0.146.0/examples/js/shaders/ToneMappingShader.js"></script>
+  <script src="https://unpkg.com/three@0.146.0/examples/js/shaders/ColorGradingShader.js"></script>
+  <script src="https://unpkg.com/three@0.146.0/examples/js/shaders/FXAAShader.js"></script>
+  <script src="https://unpkg.com/three@0.146.0/examples/js/shaders/ShaderPass.js"></script>
+
+  <!-- Application Modules -->
+  <script src="./js/config.js"></script>
+  <script src="./js/lighting.js"></script>
+  <script src="./js/materialManager.js"></script>
+  <script src="./js/modelLoader.js"></script>
+  <script src="./js/uiControls.js"></script>
+  <script src="./js/sceneManager.js"></script>
+  <script src="./js/stageManager.js"></script>
+  <script src="./js/curveTool.js"></script>
+  <script src="./js/main.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #1a1a1a;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+
+    #c {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+
+    /* Top Controls */
+    .top-controls {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 20px;
+      border-radius: 25px;
+      backdrop-filter: blur(10px);
+    }
+
+    .btn {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      min-width: 80px;
+    }
+
+    .btn:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn.secondary {
+      background: #2196F3;
+    }
+
+    .btn.secondary:hover {
+      background: #1976D2;
+    }
+
+    .btn.danger {
+      background: #f44336;
+    }
+
+    .btn.danger:hover {
+      background: #d32f2f;
+    }
+
+
+    /* Help Overlay */
+    .help-overlay-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .help-overlay {
+      background: rgba(20, 20, 20, 0.95);
+      color: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+
+    .help-overlay h3 {
+      margin: 0 0 12px 0;
+      font-weight: 600;
+    }
+
+    .help-overlay p {
+      margin: 0 0 16px 0;
+      line-height: 1.5;
+      color: #e8e8e8;
+    }
+
+    .help-list {
+      margin: 0 0 18px 0;
+      padding-left: 18px;
+    }
+
+    .help-list li {
+      margin: 6px 0;
+    }
+
+    .help-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    /* Background Control */
+    .background-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: white;
+      font-size: 14px;
+    }
+
+    .background-select {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 15px;
+      color: white;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .background-select:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .background-select option {
+      background: #333;
+      color: white;
+    }
+
+    /* Material Control */
+    .material-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: white;
+      font-size: 14px;
+    }
+
+    .material-select {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 15px;
+      color: white;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .material-select:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .material-select option {
+      background: #333;
+      color: white;
+    }
+
+
+
+    /* Bottom Controls */
+    .bottom-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 15px;
+      backdrop-filter: blur(10px);
+      min-width: 300px;
+    }
+
+    .stage-info {
+      display: none;
+    }
+
+    .stage-controls {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .slider-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      min-width: 250px;
+      position: relative;
+      padding-top: 10px;
+    }
+
+    .slider-value-display {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 500;
+      margin-top: 5px;
+    }
+
+    .stage-slider {
+      width: 100%;
+      height: 80px;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      position: absolute;
+      top: 15px;
+      left: 0;
+      z-index: 15;
+      margin: 0;
+      padding: 0;
+    }
+
+    .stage-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 48px;
+      border-radius: 10px;
+      background: #2196F3;
+      cursor: pointer;
+      border: 2px solid white;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+      margin-top: 0;
+    }
+
+    .stage-slider::-moz-range-thumb {
+      width: 20px;
+      height: 48px;
+      border-radius: 10px;
+      background: #2196F3;
+      cursor: pointer;
+      border: 2px solid white;
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+      margin-top: 0;
+    }
+
+    .stage-slider::-webkit-slider-runnable-track {
+      background: transparent;
+      height: 48px;
+    }
+
+    .stage-slider::-moz-range-track {
+      background: transparent;
+      height: 48px;
+    }
+
+    /* Dual Jaw Progress Bars */
+    .jaw-progress-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      margin-top: 0;
+      position: relative;
+    }
+
+    .jaw-progress-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .jaw-label-row {
+      display: none;
+    }
+
+    .jaw-progress-bar-container {
+      position: relative;
+      width: 100%;
+      height: 20px;
+      background: transparent;
+      border-radius: 0;
+      overflow: visible;
+    }
+
+    .jaw-progress-bar-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      background-image: radial-gradient(circle,
+          rgba(255, 255, 255, 0.25) 2px,
+          transparent 2px);
+      background-size: 12px 100%;
+      background-position: center;
+      background-repeat: repeat-x;
+    }
+
+    .jaw-progress-bar-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      background: transparent;
+      overflow: hidden;
+    }
+
+    .jaw-progress-bar-fill.upper::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      width: 100%;
+      height: 8px;
+      background-image: radial-gradient(circle,
+          #2196F3 3px,
+          transparent 3px);
+      background-size: 12px 100%;
+      background-position: center;
+      background-repeat: repeat-x;
+    }
+
+    .jaw-progress-bar-fill.lower::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      width: 100%;
+      height: 8px;
+      background-image: radial-gradient(circle,
+          #4CAF50 3px,
+          transparent 3px);
+      background-size: 12px 100%;
+      background-position: center;
+      background-repeat: repeat-x;
+    }
+
+    .jaw-progress-bar-outline {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 2px;
+      background: transparent;
+      box-sizing: border-box;
+    }
+
+    .jaw-progress-bar-outline.upper-outline {
+      border-color: rgba(33, 150, 243, 0.5);
+    }
+
+    .jaw-progress-bar-outline.lower-outline {
+      border-color: rgba(76, 175, 80, 0.5);
+    }
+
+    .jaw-progress-labels {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-top: 3px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .jaw-progress-label-left {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .jaw-progress-label-right {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* Timeline Numbers */
+    .timeline-numbers {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-top: 5px;
+      margin-bottom: 5px;
+      position: relative;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    .timeline-number {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-weight: 400;
+      text-align: center;
+      flex: 0 0 auto;
+      position: absolute;
+      transform: translateX(-50%);
+    }
+
+    .loader {
+      border: 16px solid #f3f3f3;
+      border-top: 16px solid #3498db;
+      border-radius: 50%;
+      width: 120px;
+      height: 120px;
+      position: fixed;
+      left: calc(50% - 60px);
+      top: calc(50% - 60px);
+      animation: spin 2s linear infinite;
+      z-index: 1000;
+    }
+
+    .progress {
+      position: fixed;
+      left: calc(50% - 60px);
+      top: calc(50% - 20px);
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      z-index: 1000;
+      text-align: center;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      .top-controls {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 15px;
+      }
+
+      .btn {
+        padding: 6px 12px;
+        font-size: 12px;
+        min-width: 60px;
+      }
+
+      .background-control,
+      .material-control {
+        font-size: 12px;
+      }
+
+      .background-select,
+      .material-select {
+        font-size: 11px;
+        padding: 3px 6px;
+      }
+
+      .bottom-controls {
+        bottom: 10px;
+        padding: 15px;
+        min-width: 280px;
+      }
+
+      .stage-info {
+        font-size: 16px;
+      }
+
+      .stage-controls {
+        gap: 10px;
+      }
+
+      .slider-container {
+        min-width: 150px;
+      }
+
+      .jaw-progress-container {
+        gap: 10px;
+      }
+
+      .jaw-label-row {
+        font-size: 11px;
+      }
+
+      .jaw-progress-bar-container {
+        height: 20px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .top-controls {
+        top: 10px;
+        padding: 6px 12px;
+      }
+
+      .bottom-controls {
+        bottom: 5px;
+        padding: 12px;
+        min-width: 250px;
+      }
+
+      .stage-info {
+        font-size: 14px;
+      }
+    }
+
+    /* ===================================================================
+       New Design UI (matches target mockup)
+       =================================================================== */
+    .legacy-ui {
+      display: none !important;
+    }
+
+    :root {
+      --nc-bg: #141414;
+      --nc-panel: #1e1e1e;
+      --nc-panel-2: #262626;
+      --nc-border: rgba(255, 255, 255, 0.08);
+      --nc-text: #e8e8e8;
+      --nc-text-dim: #9a9a9a;
+      --nc-accent: #cf9b6d;
+      --nc-accent-text: #1a1a1a;
+    }
+
+    /* Left tool toolbar */
+    .nc-left-toolbar {
+      position: fixed;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 6px;
+      background: rgba(20, 20, 20, 0.85);
+      border: 1px solid var(--nc-border);
+      border-left: none;
+      border-radius: 0 10px 10px 0;
+      backdrop-filter: blur(10px);
+      z-index: 120;
+    }
+
+    .nc-tool-btn {
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      color: var(--nc-text-dim);
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .nc-tool-btn:hover {
+      background: var(--nc-panel-2);
+      color: var(--nc-text);
+    }
+
+    .nc-tool-btn.active {
+      background: var(--nc-accent);
+      color: var(--nc-accent-text);
+    }
+
+    .nc-tool-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Top view bar */
+    .nc-top-bar {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 6px 10px;
+      background: rgba(20, 20, 20, 0.85);
+      border: 1px solid var(--nc-border);
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+      z-index: 120;
+    }
+
+    .nc-view-btn {
+      background: transparent;
+      border: none;
+      color: var(--nc-text-dim);
+      font: 600 12px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      letter-spacing: 0.08em;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .nc-view-btn:hover {
+      background: var(--nc-panel-2);
+      color: var(--nc-text);
+    }
+
+    .nc-view-btn.active {
+      color: var(--nc-accent);
+    }
+
+    .nc-top-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--nc-border);
+      margin: 0 6px;
+    }
+
+    .nc-icon-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--nc-text-dim);
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .nc-icon-btn:hover {
+      background: var(--nc-panel-2);
+      color: var(--nc-text);
+    }
+
+    .nc-icon-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Right sidebar */
+    .nc-sidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 300px;
+      background: var(--nc-panel);
+      border-left: 1px solid var(--nc-border);
+      display: flex;
+      flex-direction: column;
+      color: var(--nc-text);
+      z-index: 115;
+    }
+
+    .nc-tabs {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 10px 12px 0;
+      border-bottom: 1px solid var(--nc-border);
+    }
+
+    .nc-tab {
+      background: transparent;
+      border: none;
+      color: var(--nc-text-dim);
+      font: 500 12px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 8px 6px 12px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+
+    .nc-tab:hover {
+      color: var(--nc-text);
+    }
+
+    .nc-tab.active {
+      color: var(--nc-accent);
+      border-bottom-color: var(--nc-accent);
+    }
+
+    .nc-sidebar-body {
+      padding: 18px 16px;
+      overflow-y: auto;
+    }
+
+    .nc-section-label {
+      font: 600 11px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      letter-spacing: 0.12em;
+      color: var(--nc-text-dim);
+      margin: 0 0 10px;
+    }
+
+    .nc-toggle-group {
+      display: flex;
+      background: var(--nc-bg);
+      border: 1px solid var(--nc-border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .nc-toggle {
+      flex: 1;
+      text-align: center;
+      background: transparent;
+      border: none;
+      color: var(--nc-text-dim);
+      font: 500 13px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .nc-toggle.active {
+      background: var(--nc-accent);
+      color: var(--nc-accent-text);
+    }
+
+    .nc-help-text {
+      font: 400 12px/1.5 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--nc-text-dim);
+      margin: 12px 0 22px;
+    }
+
+    .nc-sub-label {
+      font: 400 13px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--nc-text);
+      margin: 0 0 10px;
+    }
+
+    .nc-divider {
+      height: 1px;
+      background: var(--nc-border);
+      margin: 22px 0;
+    }
+
+    .nc-selection-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font: 400 13px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--nc-text);
+    }
+
+    .nc-selection-row .nc-count {
+      color: var(--nc-text-dim);
+    }
+
+    /* Right-side model thumbnail panel */
+    .nc-thumb-panel {
+      position: fixed;
+      top: 90px;
+      right: 316px;
+      width: 150px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 115;
+    }
+
+    .nc-thumb-card {
+      background: var(--nc-panel);
+      border: 1px solid var(--nc-border);
+      border-radius: 8px;
+      padding: 10px;
+      height: 150px;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+
+    .nc-thumb-card:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .nc-thumb-card.active {
+      border-color: var(--nc-accent);
+    }
+
+    .nc-thumb-title {
+      font: 600 10px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      letter-spacing: 0.1em;
+      color: var(--nc-text-dim);
+    }
+
+    .nc-thumb-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--nc-text-dim);
+    }
+
+    .nc-thumb-body svg {
+      width: 90px;
+      height: 90px;
+      opacity: 0.6;
+    }
+
+    /* Tool hint (shown while the Curve tool is active) */
+    .nc-hint {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 14px;
+      background: rgba(20, 20, 20, 0.85);
+      border: 1px solid var(--nc-border);
+      border-radius: 8px;
+      color: var(--nc-text-dim);
+      font: 400 12px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      backdrop-filter: blur(10px);
+      z-index: 120;
+    }
+
+    @media (max-width: 900px) {
+      .nc-thumb-panel {
+        display: none;
+      }
+
+      .nc-sidebar {
+        width: 240px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+
+  <!-- ============================================================
+       New Design UI
+       ============================================================ -->
+
+  <!-- Left tool toolbar -->
+  <div class="nc-left-toolbar" id="ncLeftToolbar">
+    <button class="nc-tool-btn active" data-tool="select" title="Select">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l7 17 2.5-6.5L21 11 5 3z"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="brush" title="Brush">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20c2 0 3-1 3-3 0-1.5 1-2.5 2.5-2.5T12 15c0 3-2.5 5-6 5H4z"/><path d="M14.5 12.5l6-6a2 2 0 0 0-3-3l-6 6"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="eraser" title="Eraser">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15l7-7 6 6-5 5H6l-2-2z"/><path d="M9 20h10"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="curve" title="Curve">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18C9 18 15 6 21 6"/><circle cx="3" cy="18" r="1.8"/><circle cx="21" cy="6" r="1.8"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="line" title="Line">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="5" r="1.8"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="extrude" title="Extrude">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V5"/><path d="M6 11l6-6 6 6"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="smooth" title="Smooth">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c4 0 4-8 8-8s4 8 8 8"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="faces" title="Faces">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 12h16M12 4v16"/></svg>
+    </button>
+    <button class="nc-tool-btn" data-tool="tooth" title="Tooth">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3C5 3 4 5 4 8c0 5 1 6 2 10 .5 2.5 2.5 2.5 3-.5.5-3 1-3.5 2-3.5s1.5.5 2 3.5c.5 3 2.5 3 3 .5 1-4 2-5 2-10 0-3-1-5-3-5-1.6 0-2.4 1-4 1s-2.4-1-4-1z"/></svg>
+    </button>
+  </div>
+
+  <!-- Top camera view bar -->
+  <div class="nc-top-bar" id="ncTopBar">
+    <button class="nc-view-btn active" data-view="home">HOME</button>
+    <button class="nc-view-btn" data-view="front">FRONT</button>
+    <button class="nc-view-btn" data-view="back">BACK</button>
+    <button class="nc-view-btn" data-view="top">TOP</button>
+    <button class="nc-view-btn" data-view="bottom">BOTTOM</button>
+    <button class="nc-view-btn" data-view="left">LEFT</button>
+    <button class="nc-view-btn" data-view="right">RIGHT</button>
+    <div class="nc-top-divider"></div>
+    <button class="nc-icon-btn" id="ncFitBtn" title="Fit to view">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+  </div>
+
+  <!-- Right-side model thumbnail panel -->
+  <div class="nc-thumb-panel" id="ncThumbPanel">
+    <div class="nc-thumb-card" data-thumb="jewellery">
+      <div class="nc-thumb-title">JEWELLERY</div>
+      <div class="nc-thumb-body"></div>
+    </div>
+    <div class="nc-thumb-card active" data-thumb="combined">
+      <div class="nc-thumb-title">COMBINED</div>
+      <div class="nc-thumb-body">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8c0-2.5 1.5-4 3.5-4 1.4 0 2.2.7 3 1.4C13.8 4.7 15.6 4 17 4c2 0 3.5 1.5 3.5 4 0 3-1 5.5-2 8-.6 1.5-1.2 3-2.2 3-1.2 0-1.4-1.8-1.8-3.5C14.2 12.5 13.4 12 12 12s-2.2.5-2.7 3.5C8.9 17.2 8.7 19 7.5 19c-1 0-1.6-1.5-2.2-3-1-2.5-1.3-5-1.3-8z"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right sidebar -->
+  <div class="nc-sidebar" id="ncSidebar">
+    <div class="nc-tabs">
+      <button class="nc-tab active" data-tab="base">Base</button>
+      <button class="nc-tab" data-tab="adjust">Adjust</button>
+      <button class="nc-tab" data-tab="stones">Stones</button>
+      <button class="nc-tab" data-tab="design">Design</button>
+      <button class="nc-tab" data-tab="stems">Stems</button>
+      <button class="nc-tab" data-tab="report">Report</button>
+    </div>
+    <div class="nc-sidebar-body">
+      <p class="nc-section-label">MODE</p>
+      <div class="nc-toggle-group">
+        <button class="nc-toggle active" data-mode="natural">Natural</button>
+        <button class="nc-toggle" data-mode="karat">Karat Shape</button>
+      </div>
+      <p class="nc-help-text">Follows the scanned tooth anatomy. Paint the teeth to include.</p>
+      <p class="nc-sub-label">Decoration</p>
+      <div class="nc-toggle-group">
+        <button class="nc-toggle active" data-deco="plain">Plain</button>
+        <button class="nc-toggle" data-deco="diamonds">Diamonds</button>
+      </div>
+      <div class="nc-divider"></div>
+      <p class="nc-section-label">SELECTION</p>
+      <div class="nc-selection-row">
+        <span>painted faces</span>
+        <span class="nc-count" id="ncPaintedFaces">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Controls (legacy - hidden, retained for future use) -->
+  <div class="top-controls legacy-ui">
+    <button id="hideUpperBtn" class="btn secondary">Hide Upper</button>
+    <button id="hideLowerBtn" class="btn secondary">Hide Lower</button>
+    <div class="material-control">
+      <span>Material:</span>
+      <select id="materialSelect" class="material-select">
+        <option value="realistic" selected>Realistic Teeth</option>
+        <option value="highContrast">High Contrast</option>
+        <option value="warm">Warm Ivory</option>
+        <option value="cool">Cool White</option>
+        <option value="porcelain">Porcelain</option>
+        <option value="matte">Matte Finish</option>
+        <option value="clinical">Clinical View</option>
+        <option value="anatomical">Anatomical</option>
+      </select>
+    </div>
+    <div class="background-control">
+      <span>Background:</span>
+      <select id="backgroundSelect" class="background-select">
+        <option value="dark" selected>Dark</option>
+        <option value="white">White</option>
+        <option value="lightGray">Light Gray</option>
+        <option value="darkGray">Dark Gray</option>
+        <option value="blue">Medical Blue</option>
+        <option value="transparent">Transparent</option>
+      </select>
+    </div>
+
+    <button id="resetCameraBtn" class="btn danger">Reset View</button>
+    <button id="helpBtn" class="btn secondary" title="View controls (?)">Help</button>
+  </div>
+
+  <!-- Bottom Controls (legacy - hidden, retained for future use) -->
+  <div class="bottom-controls legacy-ui">
+    <div class="stage-info" id="stageInfo">Stage: 1 of 13</div>
+    <div class="stage-controls">
+      <button id="prevBtn" class="btn">Previous</button>
+      <div class="slider-container">
+        <input type="range" id="stageSlider" class="stage-slider" min="1" max="22" value="1">
+        <div class="jaw-progress-container">
+          <div class="jaw-progress-item">
+            <div class="jaw-progress-labels">
+              <span class="jaw-progress-label-left">0</span>
+              <span class="jaw-progress-label-right" id="upperStageLabel">13</span>
+            </div>
+            <div class="jaw-progress-bar-container">
+              <div class="jaw-progress-bar-wrapper">
+                <div id="upperProgressBarFill" class="jaw-progress-bar-fill upper" style="width: 0%"></div>
+                <div id="upperProgressBarOutline" class="jaw-progress-bar-outline upper-outline" style="display: none;">
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="jaw-progress-item">
+            <div class="jaw-progress-bar-container">
+              <div class="jaw-progress-bar-wrapper">
+                <div id="lowerProgressBarFill" class="jaw-progress-bar-fill lower" style="width: 0%"></div>
+                <div id="lowerProgressBarOutline" class="jaw-progress-bar-outline lower-outline" style="display: none;">
+                </div>
+              </div>
+            </div>
+            <div class="jaw-progress-labels">
+              <span class="jaw-progress-label-left">0</span>
+              <span class="jaw-progress-label-right" id="lowerStageLabel">22</span>
+            </div>
+          </div>
+        </div>
+        <!-- <div class="timeline-numbers" id="timelineNumbers"></div> -->
+        <!-- <div class="slider-value-display" id="sliderValueDisplay">1</div> -->
+      </div>
+      <button id="nextBtn" class="btn">Next</button>
+    </div>
+  </div>
+
+  <!-- Help Overlay -->
+  <div id="helpOverlayBackdrop" class="help-overlay-backdrop" role="dialog" aria-modal="true"
+    aria-labelledby="helpTitle">
+    <div class="help-overlay">
+      <h3 id="helpTitle">How to navigate the 3D view</h3>
+      <ul class="help-list">
+        <li><strong>Rotate</strong>: Left mouse drag • One-finger drag</li>
+        <li><strong>Pan</strong>: Right mouse drag or Ctrl + Left drag • Two-finger drag</li>
+        <li><strong>Zoom</strong>: Mouse wheel • Pinch to zoom</li>
+        <li><strong>Reset view</strong>: Click "Reset View"</li>
+      </ul>
+      <p>Tip: You can reopen this help anytime using the Help button or press the <strong>?</strong> key.</p>
+      <div class="help-actions">
+        <button id="helpDontShow" class="btn">Don't show again</button>
+        <button id="helpClose" class="btn secondary">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loader" class="loader"></div>
+  <div id="progress" class="progress">0%</div>
+
+  <div class="nc-hint" id="ncCurveHint" hidden>
+    Curve: click the model to add points &nbsp;·&nbsp; click near the first point to close &nbsp;·&nbsp; Backspace to undo &nbsp;·&nbsp; Esc to clear
+  </div>
+</body>
+
+</html>
