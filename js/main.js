@@ -10,6 +10,7 @@ const loadModel = () => {
   document.getElementById("progress").style.display = "none";
   AppConfig.setIsObjectsLoaded(true);
   app.stageManager.initializeStages();
+  if (app.miniView) app.miniView.frame();
 };
 
 const manager = new THREE.LoadingManager(loadModel);
@@ -56,6 +57,16 @@ class JawViewerApp {
       // Curve drawing tool (left toolbar -> Curve)
       this.curveTool = new CurveTool(this.sceneManager, this.stageManager);
       this.uiControls.curveTool = this.curveTool;
+
+      // Small "COMBINED" preview of the working scene
+      const miniMount = document.getElementById('ncCombinedView');
+      if (miniMount) {
+        this.miniView = new MiniView(
+          this.sceneManager.getScene(),
+          miniMount,
+          this.sceneManager.getCamera()
+        );
+      }
 
       // Setup event listeners
       this.uiControls.setupEventListeners();
