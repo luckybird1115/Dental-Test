@@ -27,8 +27,10 @@
   <script src="./js/uiControls.js"></script>
   <script src="./js/sceneManager.js"></script>
   <script src="./js/stageManager.js"></script>
+  <script src="./js/shellBuilder.js"></script>
   <script src="./js/curveTool.js"></script>
   <script src="./js/brushTool.js"></script>
+  <script src="./js/stoneSetter.js"></script>
   <script src="./js/miniView.js"></script>
   <script src="./js/main.js"></script>
   <style>
@@ -698,6 +700,11 @@
       color: var(--nc-text);
     }
 
+    .nc-icon-btn.active {
+      background: var(--nc-accent);
+      color: var(--nc-accent-text);
+    }
+
     .nc-icon-btn svg {
       width: 18px;
       height: 18px;
@@ -1085,6 +1092,34 @@
       color: #ff7a29;
     }
 
+    /* Stones tab */
+    #ncStonePattern {
+      flex-wrap: wrap;
+    }
+
+    #ncStonePattern .nc-toggle {
+      flex: 1 1 calc(50% - 3px);
+      font-size: 12px;
+      padding: 7px 4px;
+    }
+
+    .nc-stones-btn {
+      width: 100%;
+      margin-top: 14px;
+      padding: 11px 0;
+      background: var(--nc-accent);
+      color: var(--nc-accent-text);
+      border: none;
+      border-radius: 8px;
+      font: 600 13px/1 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+    }
+
+    .nc-stones-btn:hover {
+      filter: brightness(1.06);
+    }
+
     @media (max-width: 900px) {
       .nc-thumb-panel {
         display: none;
@@ -1148,6 +1183,9 @@
     <button class="nc-icon-btn" id="ncFitBtn" title="Fit to view">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
     </button>
+    <button class="nc-icon-btn" id="ncIsolateBtn" title="Isolate shell (double-click: show all)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l3 6-9 12L3 9l3-6z"/><path d="M3 9h18M9 3l3 6 3-6M12 21l-3-12M12 21l3-12"/></svg>
+    </button>
   </div>
 
   <!-- Right-side model thumbnail panel -->
@@ -1173,22 +1211,85 @@
       <button class="nc-tab" data-tab="report">Report</button>
     </div>
     <div class="nc-sidebar-body">
-      <p class="nc-section-label">MODE</p>
-      <div class="nc-toggle-group">
-        <button class="nc-toggle active" data-mode="natural">Natural</button>
-        <button class="nc-toggle" data-mode="karat">Karat Shape</button>
+      <!-- BASE tab -->
+      <div id="ncBasePanel">
+        <p class="nc-section-label">MODE</p>
+        <div class="nc-toggle-group">
+          <button class="nc-toggle active" data-mode="natural">Natural</button>
+          <button class="nc-toggle" data-mode="karat">Karat Shape</button>
+        </div>
+        <p class="nc-help-text">Follows the scanned tooth anatomy. Paint the teeth to include.</p>
+        <p class="nc-sub-label">Decoration</p>
+        <div class="nc-toggle-group">
+          <button class="nc-toggle active" data-deco="plain">Plain</button>
+          <button class="nc-toggle" data-deco="diamonds">Diamonds</button>
+        </div>
+        <div class="nc-divider"></div>
+        <p class="nc-section-label">SELECTION</p>
+        <div class="nc-selection-row">
+          <span>painted faces</span>
+          <span class="nc-count" id="ncPaintedFaces">0</span>
+        </div>
       </div>
-      <p class="nc-help-text">Follows the scanned tooth anatomy. Paint the teeth to include.</p>
-      <p class="nc-sub-label">Decoration</p>
-      <div class="nc-toggle-group">
-        <button class="nc-toggle active" data-deco="plain">Plain</button>
-        <button class="nc-toggle" data-deco="diamonds">Diamonds</button>
-      </div>
-      <div class="nc-divider"></div>
-      <p class="nc-section-label">SELECTION</p>
-      <div class="nc-selection-row">
-        <span>painted faces</span>
-        <span class="nc-count" id="ncPaintedFaces">0</span>
+
+      <!-- STONES tab -->
+      <div id="ncStonesPanel" hidden>
+        <p class="nc-section-label">PATTERN</p>
+        <div class="nc-toggle-group" id="ncStonePattern">
+          <button class="nc-toggle active" data-pattern="straight">Straight</button>
+          <button class="nc-toggle" data-pattern="honeycomb">Honeycomb</button>
+          <button class="nc-toggle" data-pattern="invisible">Invisible</button>
+          <button class="nc-toggle" data-pattern="corner">Corner</button>
+        </div>
+
+        <div class="nc-divider"></div>
+        <p class="nc-section-label">STONE</p>
+        <div class="nc-arch-field">
+          <div class="nc-arch-row">
+            <span>Default size</span>
+            <span class="nc-arch-val" id="ncStoneSizeVal">1.00 mm</span>
+          </div>
+          <input type="range" id="ncStoneSize" class="nc-arch-slider" min="0.4" max="3" step="0.01" value="1">
+        </div>
+        <div class="nc-arch-field">
+          <div class="nc-arch-row">
+            <span>Gap between stones</span>
+            <span class="nc-arch-val" id="ncStoneGapVal">0.10 mm</span>
+          </div>
+          <input type="range" id="ncStoneGap" class="nc-arch-slider" min="0" max="1" step="0.01" value="0.1">
+        </div>
+        <p class="nc-help-text">Centre-to-centre spacing is each stone's radius plus this gap.</p>
+
+        <div class="nc-divider"></div>
+        <p class="nc-section-label">PRONGS</p>
+        <label class="nc-arch-check">
+          <input type="checkbox" id="ncProngScale" checked>
+          <span>Scale prong size with the stone</span>
+        </label>
+        <div class="nc-arch-field">
+          <div class="nc-arch-row">
+            <span>Prong size</span>
+            <span class="nc-arch-val" id="ncProngSizeVal">20 %</span>
+          </div>
+          <input type="range" id="ncProngSize" class="nc-arch-slider" min="0" max="60" step="1" value="20">
+        </div>
+
+        <div class="nc-divider"></div>
+        <p class="nc-section-label">MARGINS</p>
+        <div class="nc-arch-field">
+          <div class="nc-arch-row">
+            <span>Stone margin</span>
+            <span class="nc-arch-val" id="ncStoneMarginVal">0.20 mm</span>
+          </div>
+          <input type="range" id="ncStoneMargin" class="nc-arch-slider" min="0" max="2" step="0.05" value="0.2">
+        </div>
+
+        <div class="nc-divider"></div>
+        <div class="nc-selection-row">
+          <span>stones placed</span>
+          <span class="nc-count" id="ncStoneCount">0</span>
+        </div>
+        <button class="nc-stones-btn" id="ncPlaceStones">Place stones</button>
       </div>
     </div>
   </div>
@@ -1333,9 +1434,18 @@
       <input type="range" id="ncArchSpacing" class="nc-arch-slider" min="0.1" max="3" step="0.05" value="0.25">
     </div>
 
+    <div class="nc-arch-field">
+      <div class="nc-arch-row">
+        <span>Shell thickness</span>
+        <span class="nc-arch-val" id="ncArchThicknessVal">0.60 mm</span>
+      </div>
+      <input type="range" id="ncArchThickness" class="nc-arch-slider" min="0.1" max="2" step="0.05" value="0.6">
+    </div>
+
     <p class="nc-arch-hint">
       Place three points, then click the first to close the loop. Drag to move,
-      Alt-click a segment to insert, Ctrl-click a point to delete.
+      Alt-click a segment to insert, Ctrl-click a point to delete. Close the loop,
+      then "Generate shell" to build a solid cap over the selected area.
     </p>
   </div>
 

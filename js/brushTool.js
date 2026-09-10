@@ -43,7 +43,7 @@ class BrushTool {
     this.radiusMm = 1.5;
     this.category = 'stones';
 
-    this.templates = [];   // { id, category, mesh, anchors:[{position,normal}], markers:[], line }
+    this.templates = [];   // { id, category, mesh, anchors, tris, markers, line, fill }
     this._nextId = 1;
 
     this.mmPerUnit = 1 / (AppConfig.modelScale || 1);
@@ -376,14 +376,15 @@ class BrushTool {
     if (added) this._rebuildStrokeOverlay(mesh);
   }
 
-  _rebuildStrokeOverlay(mesh) {
+  // World-space triangle-soup geometry for a set of triangle indices on `mesh`.
+  // Used for the live stroke overlay and for each committed template's fill.
+  _buildPatchGeometry(mesh, triSet) {
     const topo = this._getTopology(mesh);
     const { pos, index } = topo;
-
-    const verts = new Float32Array(this._strokeTris.size * 9);
+    const verts = new Float32Array(triSet.size * 9);
     const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
     let o = 0;
-    this._strokeTris.forEach((t) => {
+    triSet.forEach((t) => {
       const i0 = index ? index.getX(t * 3) : t * 3;
       const i1 = index ? index.getX(t * 3 + 1) : t * 3 + 1;
       const i2 = index ? index.getX(t * 3 + 2) : t * 3 + 2;
@@ -394,7 +395,13 @@ class BrushTool {
       verts[o++] = b.x; verts[o++] = b.y; verts[o++] = b.z;
       verts[o++] = c.x; verts[o++] = c.y; verts[o++] = c.z;
     });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
 
+  _rebuildStrokeOverlay(mesh) {
     if (!this._strokeOverlay) {
       const mat = new THREE.MeshBasicMaterial({
         color: 0xff7a29,
@@ -412,10 +419,7 @@ class BrushTool {
     }
 
     this._strokeOverlay.geometry.dispose();
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
-    geo.computeVertexNormals();
-    this._strokeOverlay.geometry = geo;
+    this._strokeOverlay.geometry = this._buildPatchGeometry(mesh, this._strokeTris);
   }
 
   _clearStrokeOverlay() {
@@ -446,7 +450,7 @@ class BrushTool {
     if (!mesh || !tris || tris.size === 0) return;
 
     const loops = this._computeBoundaryLoops(mesh, tris);
-    loops.forEach((loop) => this._createTemplate(mesh, loop));
+    loops.forEach((loop) => this._createTemplate(mesh, loop, tris));
   }
 
   // -------------------------------------------------- boundary loop extraction
@@ -612,7 +616,7 @@ class BrushTool {
   }
 
   // --------------------------------------------------------------- templates
-  _createTemplate(mesh, loop) {
+  _createTemplate(mesh, loop, triSet) {
     const { points, normals } = this._resampleClosedLoop(loop.points, loop.normals, 1.1);
     if (points.length < 3) return;
 
@@ -621,14 +625,56 @@ class BrushTool {
       category: this.category,
       mesh,
       anchors: points.map((p, i) => ({ position: p, normal: normals[i] })),
+      tris: triSet ? new Set(triSet) : null,   // painted faces this zone covers
       markers: [],
-      line: null
+      line: null,
+      fill: null
     };
+    this._rebuildFill(tpl);
     tpl.anchors.forEach((_, i) => this._addMarker(tpl, i));
     this._rebuildLine(tpl);
 
     this.templates.push(tpl);
     this._updateList();
+  }
+
+  // Translucent surface fill so a committed zone reads as a region, not just
+  // an outline. This is the area a stone-setting pass will pack into.
+  _rebuildFill(tpl) {
+    if (tpl.fill) {
+      this.group.remove(tpl.fill);
+      tpl.fill.geometry.dispose();
+      tpl.fill.material.dispose();
+      tpl.fill = null;
+    }
+    if (!tpl.tris || !tpl.tris.size) return;
+    const geo = this._buildPatchGeometry(tpl.mesh, tpl.tris);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xff7a29,
+      transparent: true,
+      opacity: 0.28,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    });
+    tpl.fill = new THREE.Mesh(geo, mat);
+    tpl.fill.renderOrder = 996;
+    tpl.fill.layers.set(1);
+    this.group.add(tpl.fill);
+  }
+
+  // Regions for a downstream stone-setting pass:
+  //   [{ id, category, mesh, anchors:[{position,normal}], fillGeometry }]
+  getTemplateRegions() {
+    return this.templates.map((t) => ({
+      id: t.id,
+      category: t.category,
+      mesh: t.mesh,
+      anchors: t.anchors.map((a) => ({ position: a.position.clone(), normal: a.normal.clone() })),
+      fillGeometry: t.fill ? t.fill.geometry : null
+    }));
   }
 
   deleteTemplate(id) {
@@ -644,6 +690,11 @@ class BrushTool {
       this.group.remove(tpl.line);
       tpl.line.geometry.dispose();
       tpl.line.material.dispose();
+    }
+    if (tpl.fill) {
+      this.group.remove(tpl.fill);
+      tpl.fill.geometry.dispose();
+      tpl.fill.material.dispose();
     }
     this.templates.splice(idx, 1);
     this._updateList();
@@ -744,6 +795,8 @@ class BrushTool {
   }
 
   _updateList() {
+    if (typeof this.onTemplatesChanged === 'function') this.onTemplatesChanged();
+
     const list = document.getElementById('ncBrushList');
     if (!list) return;
     list.innerHTML = '';

@@ -95,8 +95,9 @@ class SceneManager {
     // Setup material manager
     this.materialManager = new MaterialManager();
 
-    // Setup environment map
-    // this.setupEnvironmentMap();
+    // Image-based lighting for PBR reflections (gems + gold shell). Only sets
+    // scene.environment - the background stays as configured.
+    this.setupEnvironmentLighting();
 
     // Controls setup
     this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
@@ -110,6 +111,24 @@ class SceneManager {
     this.setupWindowResizeHandler();
 
     return true;
+  }
+
+  // Load env.hdr and use it only as scene.environment (reflections/IBL).
+  setupEnvironmentLighting() {
+    try {
+      const loader = new THREE.RGBELoader();
+      loader.load(envHDRUrl, (texture) => {
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        pmrem.compileEquirectangularShader();
+        const envMap = pmrem.fromEquirectangular(texture).texture;
+        this.scene.environment = envMap;
+        texture.dispose();
+        pmrem.dispose();
+        console.log('Environment lighting ready');
+      }, undefined, (err) => console.warn('env.hdr failed to load', err));
+    } catch (e) {
+      console.warn('Environment lighting setup skipped', e);
+    }
   }
 
   // Setup enhanced environment map with IBL

@@ -62,6 +62,17 @@ class JawViewerApp {
       this.brushTool = new BrushTool(this.sceneManager, this.stageManager);
       this.uiControls.brushTool = this.brushTool;
 
+      // Pavé stone setter (Stones tab / Decoration -> Diamonds)
+      this.stoneSetter = new StoneSetter({
+        sceneManager: this.sceneManager,
+        brushTool: this.brushTool,
+        curveTool: this.curveTool
+      });
+      this.uiControls.stoneSetter = this.stoneSetter;
+      // Re-fill when zones or the shell change while Diamonds is on.
+      this.brushTool.onTemplatesChanged = () => this.stoneSetter.scheduleApply();
+      this.curveTool.onGenerateShell = () => this.stoneSetter.scheduleApply();
+
       // Small "COMBINED" preview of the working scene
       const miniMount = document.getElementById('ncCombinedView');
       if (miniMount) {

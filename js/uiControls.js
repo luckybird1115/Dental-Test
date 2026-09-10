@@ -101,8 +101,9 @@ class UIControls {
   // Wire up the new design UI. Camera view buttons are functional;
   // tool / tab / toggle buttons are visual selection only for now.
   setupDesignUI() {
-    // Left toolbar - tool selection. Curve and Brush are wired to behaviour;
-    // the rest are visual selection only for now.
+    // Left toolbar - tool selection. The Curve (arch) tool and the Template
+    // Brush (the "faces" grid icon) are wired to behaviour; the rest are
+    // visual selection only for now.
     const toolButtons = document.querySelectorAll('#ncLeftToolbar .nc-tool-btn');
     toolButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -110,7 +111,7 @@ class UIControls {
         btn.classList.add('active');
         const tool = btn.dataset.tool;
         if (this.curveTool) this.curveTool.setActive(tool === 'curve');
-        if (this.brushTool) this.brushTool.setActive(tool === 'brush');
+        if (this.brushTool) this.brushTool.setActive(tool === 'faces');
       });
     });
 
@@ -128,22 +129,55 @@ class UIControls {
       this.sceneManager.setView('home');
     });
 
-    // Sidebar tabs - visual selection
+    // Isolate-shell toggle. Single click: show only the generated shell + stones
+    // and hide the rest. Click again: restore. Double click: force show all.
+    const isolateBtn = document.getElementById('ncIsolateBtn');
+    if (isolateBtn) {
+      let clickTimer = null;
+      isolateBtn.addEventListener('click', () => {
+        if (clickTimer) return;             // second click of a dblclick
+        clickTimer = setTimeout(() => {
+          clickTimer = null;
+          this.setShellIsolated(!this._shellIsolated);
+        }, 220);
+      });
+      isolateBtn.addEventListener('dblclick', () => {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        this.setShellIsolated(false);
+      });
+    }
+
+    // Sidebar tabs - swap the visible panel (Base / Stones have real content;
+    // the rest fall back to Base).
     const tabButtons = document.querySelectorAll('#ncSidebar .nc-tab');
+    const tabPanels = { base: 'ncBasePanel', stones: 'ncStonesPanel' };
+    const showTabPanel = (tab) => {
+      const wanted = tabPanels[tab] || 'ncBasePanel';
+      Object.values(tabPanels).forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = (id !== wanted);
+      });
+    };
     tabButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         tabButtons.forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
+        showTabPanel(btn.dataset.tab);
       });
     });
 
-    // Toggle groups (MODE, Decoration) - visual selection
+    // Toggle groups (MODE, Decoration, stone Pattern) - visual selection.
+    // Decoration Plain/Diamonds also drives the stone setter.
     document.querySelectorAll('#ncSidebar .nc-toggle-group').forEach((group) => {
       const toggles = group.querySelectorAll('.nc-toggle');
       toggles.forEach((btn) => {
         btn.addEventListener('click', () => {
           toggles.forEach((b) => b.classList.remove('active'));
           btn.classList.add('active');
+          if (btn.dataset.deco && this.stoneSetter) {
+            this.stoneSetter.setEnabled(btn.dataset.deco === 'diamonds');
+          }
         });
       });
     });
@@ -156,6 +190,32 @@ class UIControls {
         card.classList.add('active');
       });
     });
+  }
+
+  // Show only the generated shell + stones (on), or the whole model (off).
+  setShellIsolated(on) {
+    this._shellIsolated = !!on;
+
+    const models = [
+      ...(AppConfig.maxillaryModels() || []),
+      ...(AppConfig.mandibularModels() || [])
+    ];
+
+    if (this._shellIsolated) {
+      models.forEach((m) => { if (m) m.visible = false; });
+      if (this.curveTool && this.curveTool.group) this.curveTool.group.visible = false;
+      if (this.brushTool && this.brushTool.group) this.brushTool.group.visible = false;
+      (this.curveTool && this.curveTool.shells || []).forEach((s) => { if (s) s.visible = true; });
+      if (this.stoneSetter && this.stoneSetter.group) this.stoneSetter.group.visible = true;
+    } else {
+      if (this.stageManager) this.stageManager.updateJawVisibility();
+      else models.forEach((m) => { if (m) m.visible = true; });
+      if (this.curveTool && this.curveTool.group) this.curveTool.group.visible = true;
+      if (this.brushTool && this.brushTool.group) this.brushTool.group.visible = true;
+    }
+
+    const btn = document.getElementById('ncIsolateBtn');
+    if (btn) btn.classList.toggle('active', this._shellIsolated);
   }
 
   // Update button text based on visibility state

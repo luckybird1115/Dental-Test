@@ -50,6 +50,12 @@ class CurveTool {
     this.smoothing = 3;        // Laplacian relaxation passes
     this.spacingMm = 0.25;     // distance between sampled points, millimetres
     this.showPreview = true;
+    this.shellThicknessMm = 0.6;
+
+    // Generated shells live directly in the scene (not the layer-1 edit group),
+    // so they show in the COMBINED mini view like real geometry.
+    this.shells = [];
+    this._activeShell = null;  // shell for the current closed loop, replaced on regen
 
     // Real-world scale. Models are authored ~mm then scaled by modelScale, so
     // 1 mm of real geometry == modelScale world units. Tune here if needed.
@@ -240,7 +246,7 @@ class CurveTool {
       this._syncShape();
       this.refresh();
       if (this.closed) this.computeSelection();
-      else this._clearSelection();
+      else { this._clearSelection(); this._activeShell = null; }
       this._updatePanel();
     });
 
@@ -263,16 +269,18 @@ class CurveTool {
       if (this.closed) this.computeSelection();
     });
 
+    const thickness = document.getElementById('ncArchThickness');
+    const thicknessVal = document.getElementById('ncArchThicknessVal');
+    thickness?.addEventListener('input', (e) => {
+      this.shellThicknessMm = parseFloat(e.target.value);
+      if (thicknessVal) thicknessVal.textContent = this.shellThicknessMm.toFixed(2) + ' mm';
+      if (this._activeShell) this.generateShell();   // live-update the current shell
+    });
+
     const shellBtn = document.getElementById('ncGenerateShell');
     shellBtn?.addEventListener('click', () => {
       if (shellBtn.disabled) return;
-      const faces = this.selectionMesh
-        ? this.selectionMesh.geometry.attributes.position.count / 3
-        : 0;
-      console.log(`Generate shell: ${faces} selected faces`);
-      if (typeof this.onGenerateShell === 'function') {
-        this.onGenerateShell(this.selectionMesh, this.snappedPoints);
-      }
+      this.generateShell();
     });
     this._updateShellButton();
   }
@@ -284,6 +292,71 @@ class CurveTool {
     const ready = this.closed && !!this.selectionMesh;
     btn.classList.toggle('is-ready', ready);
     btn.disabled = !ready;
+  }
+
+  // Build a solid shell from the current closed-loop selection and drop it
+  // into the scene. Re-running for the same loop replaces the previous shell;
+  // starting a new loop leaves earlier shells in place.
+  generateShell() {
+    if (!this.closed || !this.selectionMesh) return null;
+    if (typeof ShellBuilder === 'undefined') {
+      console.warn('ShellBuilder not loaded');
+      return null;
+    }
+
+    const thicknessWorld = this.shellThicknessMm / this.mmPerUnit;
+    const geo = ShellBuilder.build(this.selectionMesh.geometry, thicknessWorld);
+    if (!geo) {
+      console.warn('Generate shell: could not build geometry from selection');
+      return null;
+    }
+
+    if (this._activeShell) this._removeShell(this._activeShell);
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xe7b64a,
+      metalness: 1.0,
+      roughness: 0.32,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'GeneratedShell';
+    mesh.renderOrder = 5;
+    this.scene.add(mesh);
+    this.shells.push(mesh);
+    this._activeShell = mesh;
+
+    const faces = geo.index ? geo.index.count / 3 : 0;
+    console.log(`Generate shell: ${faces} triangles, ${this.shellThicknessMm.toFixed(2)} mm thick`);
+    this._flashShellButton();
+
+    if (typeof this.onGenerateShell === 'function') {
+      this.onGenerateShell(mesh, this.snappedPoints);
+    }
+    return mesh;
+  }
+
+  _removeShell(mesh) {
+    this.scene.remove(mesh);
+    mesh.geometry.dispose();
+    mesh.material.dispose();
+    const i = this.shells.indexOf(mesh);
+    if (i >= 0) this.shells.splice(i, 1);
+    if (this._activeShell === mesh) this._activeShell = null;
+  }
+
+  clearShells() {
+    this.shells.slice().forEach((m) => this._removeShell(m));
+  }
+
+  _flashShellButton() {
+    const btn = document.getElementById('ncGenerateShell');
+    if (!btn) return;
+    const original = btn.dataset.label || btn.textContent;
+    btn.dataset.label = original;
+    btn.textContent = 'Shell generated ✓';
+    clearTimeout(this._flashTimer);
+    this._flashTimer = setTimeout(() => { btn.textContent = btn.dataset.label || 'Generate shell'; }, 1200);
   }
 
   _syncShape() {
@@ -511,6 +584,7 @@ class CurveTool {
       this.closed = false;
       this._syncShape();
       this._clearSelection();
+      this._activeShell = null;
     }
     this.refresh();
     if (this.closed) this.computeSelection();
@@ -768,6 +842,7 @@ class CurveTool {
       this.closed = false;
       this._syncShape();
       this._clearSelection();
+      this._activeShell = null;
     } else if (this.anchors.length) {
       this._deleteAnchor(this.anchors.length - 1);
       return;
@@ -788,6 +863,7 @@ class CurveTool {
     this.anchors = [];
     this.snappedPoints = [];
     this.closed = false;
+    this._activeShell = null;   // a fresh loop generates a new shell, keeps old ones
     this._syncShape();
     this._updatePanel();
   }
