@@ -1,0 +1,8 @@
+# Netlify builds the obfuscated production bundle and serves ONLY ./dist,
+# so the raw, commented source in ./js is never deployed.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"

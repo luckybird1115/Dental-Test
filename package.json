@@ -5,8 +5,6 @@
   "main": "index.html",
   "scripts": {
     "build": "node build-script.js",
-    "obfuscate": "javascript-obfuscator js/ --output dist/js/ --config obfuscator-config.json",
-    "minify": "terser js/*.js --compress --mangle --output dist/js/",
     "dev": "live-server --port=3000"
   },
   "devDependencies": {
